@@ -3142,7 +3142,7 @@ function mediaGalleryItemHtml(idx,item,index){
 }
 function mediaGalleryBodyHtml(idx,p){
   const media = postMediaList(p);
-  const canAdd = !!currentUser;
+  const canAdd = isAllan(); // só Allan pode acrescentar imagens/vídeos; os demais só revisam/comentam
   return `<div class="media-gallery-head"><div><h2>Galeria · ${escapeHtml(p['Segmento/Página'])}</h2><p>${media.length ? `${media.length} arquivo(s). Cada imagem pode ser aprovada ou reprovada separadamente.` : 'Nenhuma imagem armazenada neste post.'}</p></div>${canAdd?`<button type="button" class="media-gallery-add" onclick="openMediaModal(${idx})">+ Adicionar imagens</button>`:''}</div>
     ${media.length ? `<div class="media-gallery-grid">${media.map((item,index)=>mediaGalleryItemHtml(idx,item,index)).join('')}</div>` : `<div class="media-empty-state">${galleryIconSvg()}<h3>A galeria está vazia</h3><p>Adicione quantas imagens ou vídeos forem necessários. A orelha permanece com a mesma cor do modal enquanto não houver arquivos.</p>${canAdd?`<button type="button" class="media-gallery-add" onclick="openMediaModal(${idx})">Adicionar imagens</button>`:''}</div>`}`;
 }
@@ -3663,6 +3663,7 @@ async function saveDrawingToComment(){
 
 function openMediaModal(idx){
   requireLogin(() => {
+    if(!isAllan()){ alert('Somente Allan pode acrescentar imagens.'); return; }
     const p = posts[idx];
     if(!p) return;
     pendingMediaFiles = [];
@@ -3735,6 +3736,7 @@ function storageSafeName(name){
   return `${base.slice(0,60)}${ext}`;
 }
 async function savePostMedia(idx){
+  if(!isAllan()){ alert('Somente Allan pode acrescentar imagens.'); return; }
   if(!pendingMediaFiles.length) return;
   const p=posts[idx],btn=document.getElementById('saveMediaBtn');
   btn.disabled=true;btn.textContent='Salvando...';
@@ -4021,7 +4023,7 @@ document.addEventListener('click', (e) => {
 function editActionButtonsHtml(){
   return editMode
     ? `<button class="btn-save" onclick="saveEdits()">Salvar</button><button class="btn-cancel" onclick="cancelEdits()">Cancelar</button>`
-    : `<button class="btn-suggest" onclick="enterEditMode()">✎ Sugerir edições</button>`;
+    : `<button class="btn-suggest" onclick="enterEditMode()">${isAllan() ? '✎ Editar' : '✎ Sugerir edições'}</button>`;
 }
 
 async function showFieldHistory(idx, key){
@@ -4314,49 +4316,78 @@ function enterEditMode(){ requireLogin(() => { editMode = true; renderPostModal(
 
 function cancelEdits(){ editMode = false; renderPostModal(); }
 
+// Mapa "chave do campo editável" -> nome real do campo salvo em posts.fields.
+// Usado só pelo caminho de gravação definitiva (Allan); as demais chaves (reelsXxx/carrossel,
+// que vêm de outra fonte de dados) continuam passando só pelo caminho de sugestão.
+function canonicalFieldName(key){
+  return {
+    titulo:'Segmento/Página', pub:'Público-alvo', dor:'Dor/Intenção', gancho:'Gancho', objetivo:'Objetivo do post',
+    estrutura:'Estrutura', textoArte:'Texto da arte', legenda:'Legenda/copy', cta:'CTA',
+    prompt:'Prompt generativo de imagem', tom:'Tom obrigatório', status:'Status'
+  }[key];
+}
+
 async function saveEdits(){
   if(!currentUser){ requireLogin(saveEdits); return; }
   const idx = currentPostIdx;
+  const p = posts[idx];
   const modal = document.getElementById('modalBody');
   const vals = modal.querySelectorAll('.val[data-key]');
   if(!suggestions[idx]) suggestions[idx] = {};
-  const toPersist = [];
+  const allan = isAllan();
+  const changed = {}; // chave -> texto novo (antes de decidir se vira sugestão ou valor definitivo)
 
-  // Público-alvo (só Allan): vem de um <select> dedicado, fora do padrão .val[data-key],
+  // Público-alvo (só Allan vê este select): vem fora do padrão .val[data-key],
   // porque é um campo categórico (cada valor tem uma letra fixa em pubLabel).
   const pubSelect = document.getElementById('editPubSelect');
   if(pubSelect){
     const text = pubSelect.value;
     const originalVal = getOriginalFieldText(idx, 'pub');
-    if(text !== originalVal.trim()){
-      suggestions[idx]['pub'] = { text, editor: currentUser.name, editedAt: new Date().toISOString(), synced: false };
-      toPersist.push('pub');
-    } else {
-      delete suggestions[idx]['pub'];
-    }
+    if(text !== originalVal.trim()) changed['pub'] = text;
   }
 
   vals.forEach(el => {
     const key = el.getAttribute('data-key');
     const text = el.innerText.trim();
     const originalVal = getOriginalFieldText(idx, key);
-    if(text !== originalVal.trim()){
-      suggestions[idx][key] = { text, editor: currentUser.name, editedAt: new Date().toISOString(), synced: false };
-      toPersist.push(key);
+    if(text !== originalVal.trim()) changed[key] = text;
+  });
+
+  // Allan acrescenta/edita o texto definitivo (grava direto no post, visível pra todo mundo);
+  // Pedro, Victor, Caroline e demais só registram uma sugestão de edição (local, some com "Novo",
+  // fica no histórico do campo) — o texto exibido só muda de fato quando Allan revisa e salva.
+  const directFieldUpdates = {};
+  Object.keys(changed).forEach(key => {
+    const text = changed[key];
+    const canonical = allan ? canonicalFieldName(key) : null;
+    if(canonical){
+      p[canonical] = text;
+      directFieldUpdates[canonical] = text;
+      delete suggestions[idx][key]; // resolve uma sugestão pendente pra esse campo, se havia
     } else {
-      delete suggestions[idx][key];
+      suggestions[idx][key] = { text, editor: currentUser.name, editedAt: new Date().toISOString(), synced: false };
     }
   });
   if(Object.keys(suggestions[idx]).length === 0) delete suggestions[idx];
   persistSuggestions();
 
-  // autosave: envia direto para o Supabase cada campo alterado
-  for(const key of toPersist){
-    const entry = suggestions[idx][key];
+  // Allan: grava o(s) campo(s) definitivo(s) direto na tabela posts (fields), pra todo mundo ver.
+  if(Object.keys(directFieldUpdates).length){
     try{
-      await sb.from('post_field_versions').insert({ post_id: idx, field_key: key, value: entry.text, edited_by: currentUser.id, editor_name: currentUser.name });
-      await sb.from('audit_log').insert({ post_id: idx, user_id: currentUser.id, user_name: currentUser.name, action_type: 'edit_field', field_key: key, to_value: entry.text });
-      entry.synced = true;
+      const mergedFields = {};
+      Object.keys(p).forEach(k => { if(!k.startsWith('__')) mergedFields[k] = p[k]; });
+      await sb.from('posts').update({ fields: mergedFields }).eq('id', p.__id);
+    }catch(e){ console.warn('Falha ao salvar valor definitivo no Supabase', e); }
+  }
+
+  // Histórico: toda mudança (sugestão ou definitiva) fica registrada em post_field_versions/audit_log.
+  for(const key of Object.keys(changed)){
+    const text = changed[key];
+    const isDirect = allan && !!canonicalFieldName(key);
+    try{
+      await sb.from('post_field_versions').insert({ post_id: idx, field_key: key, value: text, edited_by: currentUser.id, editor_name: currentUser.name });
+      await sb.from('audit_log').insert({ post_id: idx, user_id: currentUser.id, user_name: currentUser.name, action_type: isDirect ? 'edit_field_final' : 'edit_field', field_key: key, to_value: text });
+      if(suggestions[idx] && suggestions[idx][key]) suggestions[idx][key].synced = true;
     }catch(e){ console.warn('Falha ao salvar no Supabase, ficará pendente para o botão Salvar', e); }
   }
   persistSuggestions();
