@@ -311,6 +311,9 @@ function maybeReturnToOrigin(){
   if(currentUser){
     currentUser.accessLevel = USER_ACCESS_MAP[currentUser.name] || currentUser.accessLevel || 'full';
     await showSites(false);
+    // se a sessao ja estava valida (usuario nao precisou digitar o PIN de novo) e ele veio
+    // redirecionado de um site que exigia login, volta pra la em vez de ficar parado aqui
+    maybeReturnToOrigin();
   }
 })();
 </script>

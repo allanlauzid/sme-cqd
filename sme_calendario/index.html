@@ -2280,10 +2280,15 @@ function logoutUser(){
   currentUser = null;
   isGuest = false;
   onlyBlueMode = false;
-  try{ sessionStorage.removeItem(CURRENT_USER_KEY); }catch(e){}
-  updateUserBadge();
-  backToLanding();
-  showToast('Você saiu da identificação.');
+  // Logout de verdade: como as 3 páginas (landing, Calendário, Fluxograma) compartilham a
+  // mesma origem/sessionStorage, limpamos a sessão nas três — senão a landing continua
+  // "logada" e dá pra reentrar no Calendário sem digitar o PIN de novo.
+  try{
+    sessionStorage.removeItem(CURRENT_USER_KEY);
+    sessionStorage.removeItem('cqd_hub_user');
+    sessionStorage.removeItem('avcb-revisao-usuario');
+  }catch(e){}
+  window.location.href = '../index.html';
 }
 
 function escapeHtml(s){ const d = document.createElement('div'); d.innerText = s == null ? '' : s; return d.innerHTML; }
