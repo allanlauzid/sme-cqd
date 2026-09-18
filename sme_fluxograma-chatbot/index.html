@@ -23,8 +23,9 @@
   /* HEADER (mesmo estilo do calendário) */
   header{background:linear-gradient(135deg,var(--navy),var(--navy-deep)); color:#fff; padding:14px 24px 12px; position:relative; z-index:var(--z-header); box-shadow:0 4px 14px rgba(0,0,0,.18);}
   .topbar-centered{max-width:1400px; margin:0 auto; text-align:center;}
-  .topbar-centered h1{margin:0 0 3px; font-size:21.5px;}
+  .topbar-centered h1{margin:0 0 3px; font-size:21.5px; font-weight:800;}
   .topbar-centered p{margin:0 0 10px; font-size:14px; color:#c9d3e0;}
+  .topbar-centered .kicker{font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--gold-light); font-weight:700; margin-bottom:4px;}
   .controls{display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;}
   .view-toggle{display:flex; gap:6px; background:rgba(255,255,255,.12); padding:4px; border-radius:10px;}
   .view-toggle button{border:none; background:transparent; color:#fff; padding:7px 16px; border-radius:8px; font-size:14.5px; font-weight:600; cursor:pointer;}
@@ -321,6 +322,7 @@
     body{display:flex; flex-direction:column; height:100vh; height:100dvh; padding-bottom:52px;}
     header{display:flex; align-items:center; gap:8px; padding:8px 10px 8px 56px !important; min-height:54px; flex:none; position:relative;}
     .topbar-centered{flex:1; min-width:0; margin:0;}
+    .topbar-centered .kicker{display:none;}
     .topbar-centered h1{font-size:16px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; display:flex; align-items:center; gap:6px;}
     .t-long{display:none;}
     .t-chev{display:inline-block; font-size:12px; opacity:.8; transition:transform .2s;}
@@ -528,6 +530,7 @@
 
 <header>
   <div class="topbar-centered">
+    <div class="kicker">CQD · Controle de Qualidade Digital</div>
     <h1 id="appTitle" onclick="toggleHeaderInfo()"><span class="t-main">Revisão do Chatbot AVCB<span class="t-long"><span class="t-sep"> · </span><br class="m-br">Sá Moraes Engenharia</span></span><span class="t-chev" aria-hidden="true">▾</span></h1>
     <p id="appSubtitle"></p>
     <div class="controls">

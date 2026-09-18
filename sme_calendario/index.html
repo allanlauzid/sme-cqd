@@ -272,9 +272,10 @@
 
   /* Cabeçalho centralizado (landing e campanha) */
   .topbar-centered{max-width:1200px; margin:0 auto; text-align:center;}
-  .topbar-centered h1{margin:0 0 4px; font-size:20px;}
+  .topbar-centered h1{margin:0 0 4px; font-size:20px; font-weight:800;}
   .topbar-centered p{margin:0 0 14px; font-size:13px; color:#c9d3e0;}
   .topbar-centered .view-toggle{margin:0 auto; width:fit-content;}
+  .topbar-centered .kicker{font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--gold-light); font-weight:700; margin-bottom:4px;}
   .landing-subtitle{text-align:center; color:var(--muted); font-size:13px; margin:-14px 0 24px;}
 
   /* Sidebar retrátil (desktop) */
@@ -424,6 +425,34 @@
   .media-zoom-trigger:hover .media-zoom-hint,.media-zoom-trigger:focus-visible .media-zoom-hint{opacity:1;}
   .media-comments-link{display:inline-flex; align-items:center; gap:5px; margin-top:6px; border:none; background:none; color:var(--media-accent-dark); font-size:11.5px; font-weight:700; cursor:pointer; padding:0;}
   .media-comments-link:hover{text-decoration:underline;}
+
+  /* ---- Preview estilo Instagram (post com imagem/vídeo + legenda) ---- */
+  .ig-post-card{max-width:380px;margin:0 auto;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
+  .ig-post-header{display:flex;align-items:center;gap:10px;padding:12px 14px;}
+  .ig-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--gold));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;}
+  .ig-post-header-text{display:flex;flex-direction:column;line-height:1.35;min-width:0;}
+  .ig-post-header-text strong{font-size:13.5px;color:var(--text);}
+  .ig-post-header-text span{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ig-post-media{position:relative;width:100%;background:#000;overflow:hidden;}
+  .ig-media-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;width:100%;height:100%;scrollbar-width:none;}
+  .ig-media-track::-webkit-scrollbar{display:none;}
+  .ig-media-track > *{flex:0 0 100%;scroll-snap-align:start;width:100%;height:100%;}
+  .ig-media-track img,.ig-media-track video{width:100%;height:100%;object-fit:contain;background:#000;display:block;}
+  .ig-media-empty{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,.7);font-size:12.5px;}
+  .ig-media-empty svg{width:36px;height:36px;}
+  .ig-media-nav{position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:none;background:rgba(255,255,255,.9);color:var(--text);font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .ig-media-nav.prev{left:8px;}
+  .ig-media-nav.next{right:8px;}
+  .ig-media-dots{position:absolute;bottom:9px;left:0;right:0;display:flex;justify-content:center;gap:5px;pointer-events:none;}
+  .ig-media-dots span{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.5);}
+  .ig-media-dots span.active{background:#fff;}
+  .ig-post-actions{display:flex;align-items:center;gap:14px;padding:11px 14px 2px;color:var(--text);font-size:19px;line-height:1;}
+  .ig-post-caption{padding:8px 14px 20px;font-size:13.5px;line-height:1.5;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+  .ig-post-caption strong{margin-right:6px;}
+  .ig-no-caption{color:var(--muted);font-style:italic;}
+  .ig-edit-btn-wrap{max-width:380px;margin:16px auto 0;}
+  .ig-edit-btn{display:block;width:100%;border:none;padding:15px;border-radius:11px;font-size:16px;font-weight:800;cursor:pointer;background:var(--gold);color:var(--navy);}
+  .ig-edit-btn:hover{background:var(--gold-light);}
 
   /* ---- Lightbox: imagem ampliada, zoom/pan, comentários e rabisco ---- */
   .lightbox-backdrop{position:fixed; inset:0; z-index:500; background:rgba(3,12,28,.94); display:none; flex-direction:column;}
@@ -580,6 +609,7 @@
 
 <header>
   <div class="topbar-centered">
+    <div class="kicker">CQD · Controle de Qualidade Digital</div>
     <h1>Calendário Editorial AVCB · Sá Moraes Engenharia</h1>
     <p id="appSubtitle">51 posts · 20/07 a 23/08/2026 · Stories, Feed e Reels por segmento</p>
     <div class="view-toggle landing-toggle">
@@ -4016,7 +4046,14 @@ async function showFieldHistory(idx, key){
 async function openPost(idx, mode){
   currentPostIdx = idx;
   editMode = false;
-  postModalMode = mode === 'media' ? 'media' : 'details';
+  const p0 = posts[idx];
+  if(mode === 'media' || mode === 'details' || mode === 'preview'){
+    postModalMode = mode;
+  } else {
+    // abertura padrao pelo card: se o post tiver midia (imagem/video) E legenda,
+    // mostra primeiro o preview no formato Instagram; senao, vai direto pros detalhes.
+    postModalMode = (p0 && hasPostMedia(p0) && (p0['Legenda/copy']||'').trim()) ? 'preview' : 'details';
+  }
   document.getElementById('backdrop').classList.add('active');
   const modalEl = document.getElementById('modalBody');
   modalEl.innerHTML = '<p style="padding:24px;color:#66758A;">Carregando...</p>';
@@ -4033,6 +4070,83 @@ function togglePostMediaMode(idx){
   editMode = false;
   renderPostModal();
   document.getElementById('modalBody').scrollTop = 0;
+}
+
+function showPostPreview(idx){
+  if(currentPostIdx !== idx) currentPostIdx = idx;
+  postModalMode = 'preview';
+  editMode = false;
+  renderPostModal();
+  document.getElementById('modalBody').scrollTop = 0;
+}
+
+function showPostDetails(idx){
+  if(currentPostIdx !== idx) currentPostIdx = idx;
+  postModalMode = 'details';
+  editMode = false;
+  renderPostModal();
+  document.getElementById('modalBody').scrollTop = 0;
+}
+
+function igAspectRatioFor(p){
+  const media = postMediaList(p);
+  const first = media[0];
+  if(first && first.ratio){
+    const m = String(first.ratio).match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/);
+    if(m) return `${m[1]}/${m[2]}`;
+  }
+  return p['Formato'] === 'Feed' ? '4/5' : '9/16';
+}
+
+function igMediaSlideHtml(item){
+  const url = safeMediaUrl(item.url);
+  const isVideo = String(item.type||'').startsWith('video/');
+  if(!url) return `<div class="ig-media-empty">${galleryIconSvg()}<span>Arquivo indisponível</span></div>`;
+  return isVideo
+    ? `<video src="${url}" controls preload="metadata"></video>`
+    : `<img src="${url}" alt="${escapeHtml(item.name||'Imagem do post')}" loading="lazy">`;
+}
+
+function instagramPreviewHtml(idx,p){
+  const media = postMediaList(p);
+  const caption = (p['Legenda/copy']||'').trim();
+  const mediaBody = media.length
+    ? `<div class="ig-media-track" id="igMediaTrack">${media.map(igMediaSlideHtml).join('')}</div>
+       ${media.length > 1 ? `
+       <button type="button" class="ig-media-nav prev" onclick="igScrollMedia(-1)" aria-label="Mídia anterior">‹</button>
+       <button type="button" class="ig-media-nav next" onclick="igScrollMedia(1)" aria-label="Próxima mídia">›</button>
+       <div class="ig-media-dots" id="igMediaDots">${media.map((_,i)=>`<span class="${i===0?'active':''}"></span>`).join('')}</div>` : ''}`
+    : `<div class="ig-media-empty">${galleryIconSvg()}<span>Nenhuma mídia neste post</span></div>`;
+  return `<button class="close" onclick="closeModal()" aria-label="Fechar">✕</button>
+    <div class="ig-post-card">
+      <div class="ig-post-header">
+        <div class="ig-avatar">SM</div>
+        <div class="ig-post-header-text">
+          <strong>samoraesengenharia</strong>
+          <span>${escapeHtml(p['Segmento/Página']||'')}</span>
+        </div>
+      </div>
+      <div class="ig-post-media" style="aspect-ratio:${igAspectRatioFor(p)};">${mediaBody}</div>
+      <div class="ig-post-actions">♥ &nbsp; 💬 &nbsp; ➤</div>
+      <div class="ig-post-caption">${caption ? `<strong>samoraesengenharia</strong>${escapeHtml(caption)}` : '<span class="ig-no-caption">Sem legenda cadastrada ainda.</span>'}</div>
+    </div>
+    <div class="ig-edit-btn-wrap"><button type="button" class="ig-edit-btn" onclick="showPostDetails(${idx})">Editar</button></div>`;
+}
+
+function igScrollMedia(dir){
+  const track = document.getElementById('igMediaTrack');
+  if(!track) return;
+  track.scrollBy({ left: dir * track.clientWidth, behavior: 'smooth' });
+}
+
+function igBindMediaDots(){
+  const track = document.getElementById('igMediaTrack');
+  const dotsWrap = document.getElementById('igMediaDots');
+  if(!track || !dotsWrap) return;
+  track.addEventListener('scroll', () => {
+    const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    dotsWrap.querySelectorAll('span').forEach((d, di) => d.classList.toggle('active', di === i));
+  });
 }
 
 // gera um link direto pro card (ex.: https://site/#post=42&campanha=<uuid>) e copia
@@ -4108,6 +4222,12 @@ function renderPostModal(){
   const modal = document.getElementById('modalBody');
   const mediaModeColored = postModalMode === 'media' && hasPostMedia(p);
   modal.classList.toggle('media-mode', mediaModeColored);
+  modal.classList.toggle('ig-mode', postModalMode === 'preview');
+  if(postModalMode === 'preview'){
+    modal.innerHTML = instagramPreviewHtml(idx,p);
+    igBindMediaDots();
+    return;
+  }
   if(postModalMode === 'media'){
     modal.innerHTML = `<button class="close" onclick="closeModal()" aria-label="Fechar">✕</button>
       ${modalMediaEarHtml(idx,p)}
@@ -4123,6 +4243,7 @@ function renderPostModal(){
     ${modalMediaEarHtml(idx,p)}
     <div class="modal-top-row">
       ${reviewToggleButtonsHtml(idx, 28)}
+      ${hasPostMedia(p) ? `<button type="button" class="copy-link-pill" onclick="showPostPreview(${idx})">📷 Preview</button>` : ''}
       <button type="button" class="copy-link-pill" onclick="copyPostLink(${idx})"><img src="data:image/png;base64,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" alt="" class="copy-link-icon"> Copiar URL do card</button>
       <div class="stage-ratchet-wrap">${stageRatchetHtml(idx)}</div>
     </div>
@@ -4696,6 +4817,7 @@ function closeModal(){
   }
   document.getElementById('backdrop').classList.remove('active');
   document.getElementById('modalBody').classList.remove('media-mode');
+  document.getElementById('modalBody').classList.remove('ig-mode');
   postModalMode = 'details';
 }
 // Um único listener de Esc para todas as camadas de modal: fecha só a de cima
